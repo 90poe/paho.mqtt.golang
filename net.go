@@ -174,6 +174,17 @@ func startIncommingComms(conn net.Conn,
 				}
 				msg = ibMsg.cp
 
+				DEBUG.Println(NET, "try to getInboundPacket with mID: ", msg.Details().MessageID)
+				inPkt := c.getInboundPacket(msg.Details().MessageID)
+				DEBUG.Println(NET, "getInboundPacket with got: ", inPkt.Details())
+				DEBUG.Println(NET, "try to check if it is pub packet: ", msg.Details().MessageID)
+				_, pOk := inPkt.(*packets.PublishPacket)
+				if pOk {
+					DEBUG.Println(NET, "pub packet found, skipping: ", msg.Details().MessageID)
+					c.UpdateLastReceived() // Notify keepalive logic that we recently received a packet
+					continue
+				}
+				DEBUG.Println(NET, "persist incoming message to the store: ", msg.Details().MessageID)
 				c.persistInbound(msg)
 				c.UpdateLastReceived() // Notify keepalive logic that we recently received a packet
 			}
@@ -200,6 +211,14 @@ func startIncommingComms(conn net.Conn,
 				c.freeID(m.MessageID)
 			case *packets.PublishPacket:
 				DEBUG.Println(NET, "received publish, msgId:", m.MessageID)
+				pkt := c.getOutboundPacket(m.MessageID)
+				DEBUG.Println(NET, "pkt getOutboundPacket getOutboundPacket, msgId:", m.MessageID)
+				_, ok := pkt.(*packets.PubrecPacket)
+				if ok {
+					DEBUG.Println(NET, "pkt publish skipping, msgId:", m.MessageID)
+					continue
+				}
+				DEBUG.Println(NET, "pkt publish handle without skipping, msgId:", m.MessageID)
 				output <- incommingComms{incommingPub: m}
 			case *packets.PubackPacket:
 				DEBUG.Println(NET, "received puback, id:", m.MessageID)
@@ -343,6 +362,8 @@ type commsFns interface {
 	persistOutbound(m packets.ControlPacket) // add the packet to the outbound store
 	persistInbound(m packets.ControlPacket)  // add the packet to the inbound store
 	pingRespReceived()                       // Called when a ping response is received
+	getInboundPacket(mID uint16) packets.ControlPacket
+	getOutboundPacket(mID uint16) packets.ControlPacket
 }
 
 // startComms initiates goroutines that handles communications over the network connection
@@ -424,6 +445,7 @@ func ackFunc(oboundP chan *PacketAndToken, persist Store, packet *packets.Publis
 			pr := packets.NewControlPacket(packets.Pubrec).(*packets.PubrecPacket)
 			pr.MessageID = packet.MessageID
 			DEBUG.Println(NET, "putting pubrec msg on obound")
+			persistOutbound(persist, pr)
 			oboundP <- &PacketAndToken{p: pr, t: nil}
 			DEBUG.Println(NET, "done putting pubrec msg on obound")
 		case 1:

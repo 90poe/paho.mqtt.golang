@@ -91,7 +91,7 @@ func persistOutbound(s Store, m packets.ControlPacket) {
 		}
 	case 2:
 		switch m.(type) {
-		case *packets.PublishPacket:
+		case *packets.PublishPacket, *packets.PubrecPacket:
 			// Sending publish. store in obound
 			// until pubrel received
 			s.Put(outboundKeyFromMID(m.Details().MessageID), m)

@@ -1005,3 +1005,11 @@ func (c *client) persistInbound(m packets.ControlPacket) {
 func (c *client) pingRespReceived() {
 	atomic.StoreInt32(&c.pingOutstanding, 0)
 }
+
+func (c *client) getInboundPacket(mID uint16) packets.ControlPacket {
+	return c.persist.Get(inboundKeyFromMID(mID))
+}
+
+func (c *client) getOutboundPacket(mID uint16) packets.ControlPacket {
+	return c.persist.Get(outboundKeyFromMID(mID))
+}
