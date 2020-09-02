@@ -882,7 +882,7 @@ func (c *client) resume(subscription bool, ibound chan packets.ControlPacket) {
 				ERROR.Println(STR, "invalid message type in store (discarded)")
 				c.persist.Del(key)
 			}
-		} else {
+		} else if isKeyInbound(key) {
 			switch packet.(type) {
 			case *packets.PubrelPacket:
 				DEBUG.Println(STR, fmt.Sprintf("loaded pending incomming (%d)", details.MessageID))

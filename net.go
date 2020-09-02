@@ -174,6 +174,12 @@ func startIncommingComms(conn net.Conn,
 				}
 				msg = ibMsg.cp
 
+				if msg == nil {
+					continue
+				}
+
+				DEBUG.Printf("[%s] received packet from ibound: %d -> %s", NET, msg.Details().MessageID, reflect.TypeOf(msg).String())
+
 				c.persistInbound(msg)
 				c.UpdateLastReceived() // Notify keepalive logic that we recently received a packet
 			}
@@ -212,6 +218,21 @@ func startIncommingComms(conn net.Conn,
 				output <- incommingComms{outbound: &PacketAndToken{p: prel, t: nil}}
 			case *packets.PubrelPacket:
 				DEBUG.Println(NET, "received pubrel, id:", m.MessageID)
+
+				// Check this later
+				DEBUG.Println(NET, "received pubrel, start running runHandlers id:", m.MessageID)
+				cc, ok := c.(*client)
+				if !ok {
+					DEBUG.Println(NET, "received pubrel, failed to cast to *client id:", m.MessageID)
+				} else {
+					clientOpts := cc.OptionsReader()
+					DEBUG.Println(NET, "received pubrel, start running handlers for id:", m.MessageID)
+					cc.msgRouter.runHandlers(m.MessageID, clientOpts.Order(), cc)
+					DEBUG.Println(NET, "received pubrel, delete from store:", m.MessageID, pubKey(m.MessageID))
+					cc.persist.Del(pubKey(m.MessageID))
+				}
+				DEBUG.Println(NET, "received pubrel, end running runHandlers id:", m.MessageID)
+
 				pc := packets.NewControlPacket(packets.Pubcomp).(*packets.PubcompPacket)
 				pc.MessageID = m.MessageID
 				c.persistOutbound(pc)
