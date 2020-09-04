@@ -129,7 +129,7 @@ func (r *router) setDefaultHandler(handler MessageHandler) {
 }
 
 func pubKey(id uint16) string {
-	const prefix = "pub."
+	const prefix = "p."
 	return prefix + strconv.Itoa(int(id))
 }
 
