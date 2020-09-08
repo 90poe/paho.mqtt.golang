@@ -227,9 +227,9 @@ func startIncommingComms(conn net.Conn,
 				} else {
 					clientOpts := cc.OptionsReader()
 					DEBUG.Println(NET, "received pubrel, start running handlers for id:", m.MessageID)
-					cc.msgRouter.runHandlers(m.MessageID, clientOpts.Order(), cc)
+					cc.msgRouter.handleQoS2Packets(m.MessageID, clientOpts.Order(), cc)
 					DEBUG.Println(NET, "received pubrel, delete from store:", m.MessageID, pubKey(m.MessageID))
-					cc.persist.Del(pubKey(m.MessageID))
+					//cc.persist.Del(pubKey(m.MessageID))
 				}
 				DEBUG.Println(NET, "received pubrel, end running runHandlers id:", m.MessageID)
 

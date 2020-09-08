@@ -142,31 +142,46 @@ func (r *router) matchAndDispatch(messages <-chan *packets.PublishPacket, order 
 	for message := range messages {
 		id := message.MessageID
 		m := messageFromPublish(message, ackFunc(client.oboundP, client.persist, message))
-		DEBUG.Println(ROU, "matchAndDispatch get pkt from the store: ", id)
-		pkt := store.Get(pubKey(id))
-		DEBUG.Println(ROU, "matchAndDispatch got pkt from the store: ", pkt)
-		if pkt != nil {
+		if message.Qos == 2 {
+			DEBUG.Println(ROU, "matchAndDispatch get pkt from the store: ", id)
+			pkt := store.Get(pubKey(id))
+			DEBUG.Println(ROU, "matchAndDispatch got pkt from the store: ", pkt)
+			if pkt != nil {
+				m.Ack()
+				continue
+			}
+			DEBUG.Println(ROU, "matchAndDispatch put pkt to the store: ", id, message)
+			store.Put(pubKey(id), message)
 			m.Ack()
-			continue
+		} else {
+			r.runHandlers(message, order, client)
+			m.Ack()
 		}
-		DEBUG.Println(ROU, "matchAndDispatch put pkt to the store: ", id, message)
-		store.Put(pubKey(id), message)
-		m.Ack()
 	}
 	DEBUG.Println(ROU, "matchAndDispatch exiting")
 }
 
-func (r *router) runHandlers(mID uint16, order bool, client *client) {
+func (r *router) handleQoS2Packets(mID uint16, order bool, client *client) {
+	DEBUG.Println(ROU, "handleQoS2Packets start handling message: ", mID)
 	pkt := client.persist.Get(pubKey(mID))
 	if pkt == nil {
-		DEBUG.Println(ROU, "runHandlers pkt from store is nil: ", mID)
+		DEBUG.Println(ROU, "handleQoS2Packets pkt from store is nil: ", mID)
 		return
 	}
 	message, ok := pkt.(*packets.PublishPacket)
 	if !ok {
-		DEBUG.Println(ROU, "runHandlers failed to cast pkt from store to *packets.PublishPacket message: ", mID)
+		CRITICAL.Println(ROU, "handleQoS2Packets failed to cast pkt from store to *packets.PublishPacket message: ", mID)
+		client.persist.Del(pubKey(mID))
 		return
 	}
+	r.runHandlers(message, order, client)
+	DEBUG.Println(ROU, "handleQoS2Packets -> start delete from store: ", mID)
+	client.persist.Del(pubKey(mID))
+	DEBUG.Println(ROU, "handleQoS2Packets -> finish delete from store: ", mID)
+	DEBUG.Println(ROU, "handleQoS2Packets finish handling message: ", mID)
+}
+
+func (r *router) runHandlers(message *packets.PublishPacket, order bool, client *client) {
 	m := messageFromPublish(message, func() {})
 	sent := false
 	r.RLock()
